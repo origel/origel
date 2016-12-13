@@ -21,9 +21,13 @@ ECHO=echo
 FUMOUNT=fusermount -u
 
 # Default targets
-.PHONY: all
+.PHONY: all live iso clean doc ref test update qemu bochs drivers schemes binutils coreutils extrautils netutils userutils wireshark FORCE
 
-all:$(BUILD)/libstd.rlib $(BUILD)/initfs.rs
+all: build/harddrive.bin
+
+live: build/livedisk.bin
+
+iso: build/livedisk.iso
 
 FORCE:
 
@@ -58,10 +62,179 @@ clean:
 	cargo clean --manifest-path schemes/redoxfs/Cargo.toml
 	cargo clean --manifest-path schemes/tcpd/Cargo.toml
 	cargo clean --manifest-path schemes/udpd/Cargo.toml
+	-$(FUMOUNT) build/filesystem/
 	rm -rf initfs/bin
 	rm -rf filesystem/bin filesystem/sbin filesystem/ui/bin
 	rm -rf build
 	rm -rf target
+
+doc: \
+	doc-kernel \
+	doc-std
+
+#FORCE to let cargo decide if docs need updating
+doc-kernel: $(KBUILD)/libkernel.a FORCE
+	$(KCARGO) doc --target $(KTARGET).json
+
+doc-std: $(BUILD)/libstd.rlib FORCE
+	$(CARGO) doc --target $(TARGET).json --manifest-path libstd/Cargo.toml
+
+ref: FORCE
+
+test:
+
+update:
+
+# Emulation
+QEMU=SDL_VIDEO_X11_DGAMOUSE=0 qemu-system-$(ARCH)
+QEMUFLAGS=-serial mon:stdio -d cpu_reset -d guest_errors
+ifeq ($(ARCH),arm)
+	LD=$(ARCH)-none-eabi-ld
+	QEMUFLAGS+=-cpu arm1176 -machine integratorcp
+	QEMUFLAGS+=-nographic
+
+%.list: %
+	$(ARCH)-none-eabi-objdump -C -D $< > $@
+
+build/harddrive.bin: $(KBUILD)/kernel
+	cp $< $@
+
+qemu: build/harddrive.bin
+	$(QEMU) $(QEMUFLAGS) -kernel $<
+else
+	QEMUFLAGS+=-smp 4 -m 1024
+	ifeq ($(iommu),yes)
+		QEMUFLAGS+=-machine q35,iommu=on
+	else
+		QEMUFLAGS+=-machine q35
+	endif
+	ifeq ($(net),no)
+		QEMUFLAGS+=-net none
+	else
+		QEMUFLAGS+=-net nic,model=e1000 -net user -net dump,file=build/network.pcap
+		ifeq ($(net),redir)
+			QEMUFLAGS+=-redir tcp:8080::8080
+		endif
+	endif
+	ifeq ($(vga),no)
+		QEMUFLAGS+=-nographic -vga none
+	endif
+	#,int,pcall
+	#-device intel-iommu
+
+	UNAME := $(shell uname)
+	ifeq ($(UNAME),Darwin)
+		CC=$(ARCH)-elf-gcc
+		CXX=$(ARCH)-elf-g++
+		ECHO=/bin/echo
+		FUMOUNT=sudo umount
+		LD=$(ARCH)-elf-ld
+		LDFLAGS=--gc-sections
+		KRUSTCFLAGS+=-C linker=$(CC)
+		KCARGOFLAGS+=-C linker=$(CC)
+		RUSTCFLAGS+=-C linker=$(CC)
+		CARGOFLAGS+=-C linker=$(CC)
+		VB_AUDIO=coreaudio
+		VBM="/Applications/VirtualBox.app/Contents/MacOS/VBoxManage"
+	else
+		CC=gcc
+		CXX=g++
+		ECHO=echo
+		FUMOUNT=fusermount -u
+		LD=ld
+		LDFLAGS=--gc-sections
+		ifneq ($(kvm),no)
+			QEMUFLAGS+=-enable-kvm -cpu host
+		endif
+		VB_AUDIO="pulse"
+		VBM=VBoxManage
+	endif
+
+%.list: %
+	objdump -C -M intel -D $< > $@
+
+build/harddrive.bin: $(KBUILD)/kernel bootloader/$(ARCH)/** build/filesystem.bin
+	nasm -f bin -o $@ -D ARCH_$(ARCH) -ibootloader/$(ARCH)/ bootloader/$(ARCH)/harddrive.asm
+
+build/livedisk.bin: $(KBUILD)/kernel_live bootloader/$(ARCH)/**
+	nasm -f bin -o $@ -D ARCH_$(ARCH) -ibootloader/$(ARCH)/ bootloader/$(ARCH)/livedisk.asm
+
+build/%.bin.gz: build/%.bin
+	gzip -k -f $<
+
+build/livedisk.iso: build/livedisk.bin.gz
+	rm -rf build/iso/
+	mkdir -p build/iso/
+	cp -RL isolinux build/iso/
+	cp $< build/iso/livedisk.gz
+	genisoimage -o $@ -b isolinux/isolinux.bin -c isolinux/boot.cat \
+					-no-emul-boot -boot-load-size 4 -boot-info-table \
+					build/iso/
+	isohybrid $@
+
+qemu: build/harddrive.bin
+	$(QEMU) $(QEMUFLAGS) -drive file=$<,format=raw
+
+qemu_no_build:
+	$(QEMU) $(QEMUFLAGS) -drive file=build/harddrive.bin,format=raw
+
+qemu_live: build/livedisk.bin
+	$(QEMU) $(QEMUFLAGS) -device usb-ehci,id=flash_bus -drive id=flash_drive,file=$<,format=raw,if=none -device usb-storage,drive=flash_drive,bus=flash_bus.0
+
+qemu_live_no_build:
+	$(QEMU) $(QEMUFLAGS) -device usb-ehci,id=flash_bus -drive id=flash_drive,file=build/livedisk.bin,format=raw,if=none -device usb-storage,drive=flash_drive,bus=flash_bus.0
+
+qemu_iso: build/livedisk.iso
+	$(QEMU) $(QEMUFLAGS) -boot d -cdrom $<
+
+qemu_iso_no_build:
+		$(QEMU) $(QEMUFLAGS) -boot d -cdrom build/livedisk.iso
+
+endif
+
+bochs: build/harddrive.bin
+	bochs -f bochs.$(ARCH)
+
+virtualbox: build/harddrive.bin
+	echo "Delete VM"
+	-$(VBM) unregistervm Redox --delete; \
+	if [ $$? -ne 0 ]; \
+	then \
+		if [ -d "$$HOME/VirtualBox VMs/Redox" ]; \
+		then \
+			echo "Redox directory exists, deleting..."; \
+			$(RM) -rf "$$HOME/VirtualBox VMs/Redox"; \
+		fi \
+	fi
+	echo "Delete Disk"
+	-$(RM) harddrive.vdi
+	echo "Create VM"
+	$(VBM) createvm --name Redox --register
+	echo "Set Configuration"
+	$(VBM) modifyvm Redox --memory 1024
+	$(VBM) modifyvm Redox --vram 16
+	if [ "$(net)" != "no" ]; \
+	then \
+		$(VBM) modifyvm Redox --nic1 nat; \
+		$(VBM) modifyvm Redox --nictype1 82540EM; \
+		$(VBM) modifyvm Redox --cableconnected1 on; \
+		$(VBM) modifyvm Redox --nictrace1 on; \
+		$(VBM) modifyvm Redox --nictracefile1 build/network.pcap; \
+	fi
+	$(VBM) modifyvm Redox --uart1 0x3F8 4
+	$(VBM) modifyvm Redox --uartmode1 file build/serial.log
+	$(VBM) modifyvm Redox --usb on # on
+	$(VBM) modifyvm Redox --keyboard ps2
+	$(VBM) modifyvm Redox --mouse ps2
+	$(VBM) modifyvm Redox --audio $(VB_AUDIO)
+	$(VBM) modifyvm Redox --audiocontroller ac97
+	echo "Create Disk"
+	$(VBM) convertfromraw $< build/harddrive.vdi
+	echo "Attach Disk"
+	$(VBM) storagectl Redox --name ATA --add sata --controller IntelAHCI --bootable on --portcount 1
+	$(VBM) storageattach Redox --storagectl ATA --port 0 --device 0 --type hdd --medium build/harddrive.vdi
+	echo "Run VM"
+	$(VBM) startvm Redox
 
 # Kernel recipes
 $(KBUILD)/libcore.rlib: rust/src/libcore/lib.rs
@@ -83,10 +256,14 @@ $(KBUILD)/libcollections.rlib: rust/src/libcollections/lib.rs $(KBUILD)/libcore.
 $(KBUILD)/libkernel.a: kernel/** $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/libcollections.rlib $(BUILD)/initfs.rs
 	$(KCARGO) rustc $(KCARGOFLAGS) -C lto -o $@
 
+$(KBUILD)/libkernel_live.a: kernel/** $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/libcollections.rlib $(BUILD)/initfs.rs build/filesystem.bin
+	$(KCARGO) rustc --lib $(KCARGOFLAGS) --cfg 'feature="live"' -C lto --emit obj=$@
+
 $(KBUILD)/kernel: $(KBUILD)/libkernel.a
 	$(LD) $(LDFLAGS) -z max-page-size=0x1000 -T arch/$(ARCH)/src/linker.ld -o $@ $<
 
-kernel: $(KBUILD)/kernel
+$(KBUILD)/kernel_live: $(KBUILD)/libkernel_live.a
+	$(LD) $(LDFLAGS) -z max-page-size=0x1000 -T arch/$(ARCH)/src/linker.ld -o $@ $<
 
 # Userspace recipes
 $(BUILD)/libcore.rlib: rust/src/libcore/lib.rs
@@ -125,7 +302,7 @@ initfs/bin/%: programs/%/Cargo.toml programs/%/src/** $(BUILD)/libstd.rlib
 	mkdir -p initfs/bin
 	$(CARGO) rustc --manifest-path $< $(CARGOFLAGS) -o $@
 	strip $@
-FUMOUNT=fusermount -u
+
 initfs/bin/%: schemes/%/Cargo.toml schemes/%/src/** $(BUILD)/libstd.rlib
 	mkdir -p initfs/bin
 	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
