@@ -15,7 +15,7 @@ mod gen {
 }
 
 #[cfg(not(test))]
-#[path="../../initfs/src/initfs.rs"]
+#[path="../../build/userspace/initfs.rs"]
 mod gen;
 
 struct Handle {
