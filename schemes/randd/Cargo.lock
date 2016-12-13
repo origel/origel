@@ -1,0 +1,14 @@
+[root]
+name = "randd"
+version = "0.1.0"
+dependencies = [
+ "raw-cpuid 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[metadata]
+"checksum raw-cpuid 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7bc8e963398e6244e1d51c42dd68394f273d39ed8afc9238b74f56041b23dbd3"

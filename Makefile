@@ -12,10 +12,30 @@ KCARGOFLAGS=--target $(KTARGET).json --release -- -C soft-float
 # Default targets
 .PHONY: all
 
-all:$(KBUILD)/libcore.rlib
+all:$(KBUILD)/libkernel.a
+
+clean:
+	rm -rf build	
 
 # Kernel recipes
 $(KBUILD)/libcore.rlib: rust/src/libcore/lib.rs
 	mkdir -p $(KBUILD)
 	$(KRUSTC) $(KRUSTCFLAGS) -o $@ $<
 
+$(KBUILD)/librand.rlib: rust/src/librand/lib.rs $(KBUILD)/libcore.rlib
+	$(KRUSTC) $(KRUSTCFLAGS) -o $@ $<
+
+$(KBUILD)/liballoc.rlib: rust/src/liballoc/lib.rs $(KBUILD)/libcore.rlib
+	$(KRUSTC) $(KRUSTCFLAGS) -o $@ $<
+
+$(KBUILD)/librustc_unicode.rlib: rust/src/librustc_unicode/lib.rs $(KBUILD)/libcore.rlib
+	$(KRUSTC) $(KRUSTCFLAGS) -o $@ $<
+
+$(KBUILD)/libcollections.rlib: rust/src/libcollections/lib.rs $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/librustc_unicode.rlib
+	$(KRUSTC) $(KRUSTCFLAGS) -o $@ $<
+
+$(KBUILD)/librustc_bitflags.rlib: rust/src/librustc_bitflags/lib.rs $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/librustc_unicode.rlib
+	$(KRUSTC) $(KRUSTCFLAGS) -o $@ $<
+
+$(KBUILD)/libkernel.a: kernel/** $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/libcollections.rlib initfs/src/initfs.rs
+	$(KCARGO) rustc $(KCARGOFLAGS) -C lto -o $@

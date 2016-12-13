@@ -1,0 +1,11 @@
+[root]
+name = "ptyd"
+version = "0.1.0"
+dependencies = [
+ "redox_syscall 0.1.11",
+]
+
+[[package]]
+name = "redox_syscall"
+version = "0.1.11"
+
