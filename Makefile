@@ -12,7 +12,7 @@ KCARGOFLAGS=--target $(KTARGET).json --release -- -C soft-float
 # Default targets
 .PHONY: all
 
-all:$(KBUILD)/libkernel.a
+all:$(KBUILD)/kernel
 
 clean:
 	rm -rf build	
@@ -39,3 +39,8 @@ $(KBUILD)/librustc_bitflags.rlib: rust/src/librustc_bitflags/lib.rs $(KBUILD)/li
 
 $(KBUILD)/libkernel.a: kernel/** $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/libcollections.rlib initfs/src/initfs.rs
 	$(KCARGO) rustc $(KCARGOFLAGS) -C lto -o $@
+
+$(KBUILD)/kernel: $(KBUILD)/libkernel.a
+	$(LD) $(LDFLAGS) -z max-page-size=0x1000 -T arch/$(ARCH)/src/linker.ld -o $@ $<
+
+kernel: $(KBUILD)/kernel
