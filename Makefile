@@ -17,11 +17,12 @@ RUSTCFLAGS=--target $(TARGET).json -C opt-level=2 -C debuginfo=0
 RUSTDOC=./rustdoc.sh
 CARGO=RUSTC="$(RUSTC)" RUSTDOC="$(RUSTDOC)" cargo
 CARGOFLAGS=--target $(TARGET).json --release --
+ECHO=echo
 
 # Default targets
 .PHONY: all
 
-all:$(BUILD)/libstd.rlib
+all:$(BUILD)/libstd.rlib $(BUILD)/initfs.rs
 
 clean:
 	rm -rf build
@@ -44,10 +45,7 @@ $(KBUILD)/librustc_unicode.rlib: rust/src/librustc_unicode/lib.rs $(KBUILD)/libc
 $(KBUILD)/libcollections.rlib: rust/src/libcollections/lib.rs $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/librustc_unicode.rlib
 	$(KRUSTC) $(KRUSTCFLAGS) -o $@ $<
 
-$(KBUILD)/librustc_bitflags.rlib: rust/src/librustc_bitflags/lib.rs $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/librustc_unicode.rlib
-	$(KRUSTC) $(KRUSTCFLAGS) -o $@ $<
-
-$(KBUILD)/libkernel.a: kernel/** $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/libcollections.rlib initfs/src/initfs.rs
+$(KBUILD)/libkernel.a: kernel/** $(KBUILD)/libcore.rlib $(KBUILD)/liballoc.rlib $(KBUILD)/libcollections.rlib $(BUILD)/initfs.rs
 	$(KCARGO) rustc $(KCARGOFLAGS) -C lto -o $@
 
 $(KBUILD)/kernel: $(KBUILD)/libkernel.a
@@ -82,3 +80,39 @@ $(BUILD)/libopenlibm.a: libstd/openlibm/libopenlibm.a
 $(BUILD)/libstd.rlib: libstd/Cargo.toml rust/src/libstd/** $(BUILD)/libcore.rlib $(BUILD)/liballoc.rlib $(BUILD)/librustc_unicode.rlib $(BUILD)/libcollections.rlib $(BUILD)/librand.rlib $(BUILD)/libopenlibm.a
 	$(CARGO) rustc --verbose --manifest-path $< $(CARGOFLAGS) -o $@
 	cp libstd/target/$(TARGET)/release/deps/*.rlib $(BUILD)
+
+initfs/bin/%: drivers/%/Cargo.toml drivers/%/src/** $(BUILD)/libstd.rlib
+	mkdir -p initfs/bin
+	$(CARGO) rustc --manifest-path $< $(CARGOFLAGS) -o $@
+	strip $@
+
+initfs/bin/%: programs/%/Cargo.toml programs/%/src/** $(BUILD)/libstd.rlib
+	mkdir -p initfs/bin
+	$(CARGO) rustc --manifest-path $< $(CARGOFLAGS) -o $@
+	strip $@
+
+initfs/bin/%: schemes/%/Cargo.toml schemes/%/src/** $(BUILD)/libstd.rlib
+	mkdir -p initfs/bin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+$(BUILD)/initfs.rs: \
+		initfs/bin/init \
+		initfs/bin/ahcid \
+		initfs/bin/pcid \
+		initfs/bin/ps2d \
+		initfs/bin/redoxfs \
+		initfs/bin/vesad \
+		initfs/etc/**
+	echo 'use collections::BTreeMap;' > $@
+	echo 'pub fn gen() -> BTreeMap<&'"'"'static [u8], (&'"'"'static [u8], bool)> {' >> $@
+	echo '    let mut files: BTreeMap<&'"'"'static [u8], (&'"'"'static [u8], bool)> = BTreeMap::new();' >> $@
+	for folder in `find initfs -type d | sort`; do \
+		name=$$(echo $$folder | sed 's/initfs//' | cut -d '/' -f2-) ; \
+		$(ECHO) -n '    files.insert(b"'$$name'", (b"' >> $@ ; \
+		ls -1 $$folder | sort | awk 'NR > 1 {printf("\\n")} {printf("%s", $$0)}' >> $@ ; \
+		echo '", true));' >> $@ ; \
+	done
+	find initfs -type f -o -type l | cut -d '/' -f2- | sort | awk '{printf("    files.insert(b\"%s\", (include_bytes!(\"../../initfs/%s\"), false));\n", $$0, $$0)}' >> $@
+	echo '    files' >> $@
+	echo '}' >> $@
