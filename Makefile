@@ -18,11 +18,14 @@ RUSTDOC=./rustdoc.sh
 CARGO=RUSTC="$(RUSTC)" RUSTDOC="$(RUSTDOC)" cargo
 CARGOFLAGS=--target $(TARGET).json --release --
 ECHO=echo
+FUMOUNT=fusermount -u
 
 # Default targets
 .PHONY: all
 
 all:$(BUILD)/libstd.rlib $(BUILD)/initfs.rs
+
+FORCE:
 
 clean:
 	cargo clean
@@ -46,6 +49,17 @@ clean:
 	cargo clean --manifest-path programs/userutils/Cargo.toml
 	cargo clean --manifest-path programs/smith/Cargo.toml
 	cargo clean --manifest-path programs/tar/Cargo.toml
+	cargo clean --manifest-path schemes/ethernetd/Cargo.toml
+	cargo clean --manifest-path schemes/example/Cargo.toml
+	cargo clean --manifest-path schemes/ipd/Cargo.toml
+	cargo clean --manifest-path schemes/orbital/Cargo.toml
+	cargo clean --manifest-path schemes/ptyd/Cargo.toml
+	cargo clean --manifest-path schemes/randd/Cargo.toml
+	cargo clean --manifest-path schemes/redoxfs/Cargo.toml
+	cargo clean --manifest-path schemes/tcpd/Cargo.toml
+	cargo clean --manifest-path schemes/udpd/Cargo.toml
+	rm -rf initfs/bin
+	rm -rf filesystem/bin filesystem/sbin filesystem/ui/bin
 	rm -rf build
 	rm -rf target
 
@@ -111,7 +125,7 @@ initfs/bin/%: programs/%/Cargo.toml programs/%/src/** $(BUILD)/libstd.rlib
 	mkdir -p initfs/bin
 	$(CARGO) rustc --manifest-path $< $(CARGOFLAGS) -o $@
 	strip $@
-
+FUMOUNT=fusermount -u
 initfs/bin/%: schemes/%/Cargo.toml schemes/%/src/** $(BUILD)/libstd.rlib
 	mkdir -p initfs/bin
 	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
@@ -282,3 +296,70 @@ userutils: \
 	filesystem/bin/passwd \
 	filesystem/bin/su \
 	filesystem/bin/sudo
+
+schemes: \
+	filesystem/sbin/ethernetd \
+	filesystem/sbin/ipd \
+	filesystem/sbin/orbital \
+	filesystem/sbin/ptyd \
+	filesystem/sbin/randd \
+	filesystem/sbin/tcpd \
+	filesystem/sbin/udpd
+
+build/filesystem.bin: \
+		drivers \
+		coreutils \
+		extrautils \
+		netutils \
+		orbutils \
+		pkgutils \
+		userutils \
+		schemes \
+		filesystem/bin/acid \
+		filesystem/bin/contain \
+		filesystem/bin/ion \
+		filesystem/bin/sh \
+		filesystem/bin/smith \
+		filesystem/bin/tar
+	-$(FUMOUNT) build/filesystem/
+	rm -rf $@ build/filesystem/
+	echo exit | cargo run --manifest-path schemes/redoxfs/Cargo.toml --bin redoxfs-utility $@ 128
+	mkdir -p build/filesystem/
+	cargo build --manifest-path schemes/redoxfs/Cargo.toml --bin redoxfs-fuse --release
+	schemes/redoxfs/target/release/redoxfs-fuse $@ build/filesystem/ &
+	sleep 2
+	pgrep redoxfs-fuse
+	cp -RL filesystem/* build/filesystem/
+	chown -R 0:0 build/filesystem
+	chown -R 1000:1000 build/filesystem/home/user
+	chmod -R uog+rX build/filesystem
+	chmod -R u+w build/filesystem
+	chmod -R og-w build/filesystem
+	chmod -R 755 build/filesystem/bin
+	chmod -R u+rwX build/filesystem/root
+	chmod -R og-rwx build/filesystem/root
+	chmod -R u+rwX build/filesystem/home/user
+	chmod -R og-rwx build/filesystem/home/user
+	chmod +s build/filesystem/bin/passwd
+	chmod +s build/filesystem/bin/su
+	chmod +s build/filesystem/bin/sudo
+	mkdir build/filesystem/tmp
+	chmod 1777 build/filesystem/tmp
+	sync
+	-$(FUMOUNT) build/filesystem/
+	rm -rf build/filesystem/
+
+mount: FORCE
+	mkdir -p build/filesystem/
+	cargo build --manifest-path schemes/redoxfs/Cargo.toml --bin redoxfs-fuse --release
+	schemes/redoxfs/target/release/redoxfs-fuse build/harddrive.bin build/filesystem/ &
+	sleep 2
+	pgrep redoxfs-fuse
+
+unmount: FORCE
+	sync
+	-$(FUMOUNT) build/filesystem/
+	rm -rf build/filesystem/
+
+wireshark: FORCE
+	wireshark build/network.pcap
