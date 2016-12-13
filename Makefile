@@ -239,3 +239,46 @@ coreutils: \
 	filesystem/bin/wc \
 	filesystem/bin/yes
 	#filesystem/bin/shutdown filesystem/bin/test
+
+extrautils: \
+	filesystem/bin/calc \
+	filesystem/bin/cksum \
+	filesystem/bin/cur \
+	filesystem/bin/grep \
+	filesystem/bin/less \
+	filesystem/bin/man \
+	filesystem/bin/mdless \
+	filesystem/bin/mtxt \
+	filesystem/bin/rem \
+	#filesystem/bin/dmesg filesystem/bin/info  filesystem/bin/watch
+
+netutils: \
+	filesystem/bin/dhcpd \
+	filesystem/bin/dns \
+	filesystem/bin/httpd \
+	filesystem/bin/irc \
+	filesystem/bin/nc \
+	filesystem/bin/ntp \
+	filesystem/bin/wget
+
+orbutils: \
+	filesystem/ui/bin/browser \
+	filesystem/ui/bin/calculator \
+	filesystem/ui/bin/character_map \
+	filesystem/ui/bin/editor \
+	filesystem/ui/bin/file_manager \
+	filesystem/ui/bin/launcher \
+	filesystem/ui/bin/orblogin \
+	filesystem/ui/bin/terminal \
+	filesystem/ui/bin/viewer
+
+pkgutils: \
+	filesystem/bin/pkg
+
+userutils: \
+	filesystem/bin/getty \
+	filesystem/bin/id \
+	filesystem/bin/login \
+	filesystem/bin/passwd \
+	filesystem/bin/su \
+	filesystem/bin/sudo
