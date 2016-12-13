@@ -1,0 +1,9 @@
+name=Viewer
+binary=/ui/bin/viewer
+icon=/ui/icons/mimetypes/image-x-generic.png
+accept=*.bmp
+accept=*.jpg
+accept=*.jpeg
+accept=*.png
+author=Jeremy Soller
+description=Image Viewer for Redox
