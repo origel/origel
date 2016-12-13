@@ -1,0 +1,41 @@
+[package]
+name = "netutils"
+version = "0.1.0"
+authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+
+[lib]
+name = "netutils"
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "dhcpd"
+path = "src/dhcpd/main.rs"
+
+[[bin]]
+name = "dns"
+path = "src/dns/main.rs"
+
+[[bin]]
+name = "httpd"
+path = "src/httpd/main.rs"
+
+[[bin]]
+name = "irc"
+path = "src/irc/main.rs"
+
+[[bin]]
+name = "nc"
+path = "src/nc/main.rs"
+
+[[bin]]
+name = "ntp"
+path = "src/ntp/main.rs"
+
+[[bin]]
+name = "wget"
+path = "src/wget/main.rs"
+
+[dependencies]
+ntpclient = { git = "https://github.com/redox-os/ntpclient-rust.git" }
+suruga = { git = "https://github.com/redox-os/suruga.git" }
+termion = "1.0"

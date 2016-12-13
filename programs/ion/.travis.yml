@@ -1,0 +1,10 @@
+language: rust
+rust:
+  - nightly
+sudo: false
+notifications:
+  email: false
+script:
+  - cargo build
+  - cargo test
+  - bash examples/run_examples.sh

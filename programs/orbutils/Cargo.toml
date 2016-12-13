@@ -1,0 +1,66 @@
+[package]
+name = "orbutils"
+description = "The Orbital Utilities"
+repository = "https://github.com/redox-os/orbutils"
+version = "0.1.10"
+license-file = "LICENSE"
+readme = "README.md"
+authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+
+[[bin]]
+name = "browser"
+path = "src/browser/main.rs"
+
+[[bin]]
+name = "calculator"
+path = "src/calculator/main.rs"
+
+[[bin]]
+name = "character_map"
+path = "src/character_map/main.rs"
+
+[[bin]]
+name = "editor"
+path = "src/editor/main.rs"
+
+[[bin]]
+name = "file_manager"
+path = "src/file_manager/main.rs"
+
+[[bin]]
+name = "launcher"
+path = "src/launcher/main.rs"
+
+[[bin]]
+name = "orblogin"
+path = "src/orblogin/main.rs"
+
+[[bin]]
+name = "terminal"
+path = "src/terminal/main.rs"
+
+[[bin]]
+name = "viewer"
+path = "src/viewer/main.rs"
+
+[dependencies]
+html5ever = "*"
+html5ever-atoms = "*"
+#mime_guess = "*"
+orbclient = "0.1"
+orbfont = "0.1"
+orbimage = "0.1"
+orbtk = "0.1"
+ransid = "0.2"
+tendril = "*"
+url = { git = "https://github.com/redox-os/rust-url", branch = "redox" }
+userutils = { git = "https://github.com/redox-os/userutils.git" }
+
+[target.'cfg(not(target_os = "redox"))'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "redox")'.dependencies]
+redox_syscall = { git = "https://github.com/redox-os/syscall.git" }
+
+[replace]
+"jpeg-decoder:0.1.8" = { git = "https://github.com/redox-os/jpeg-decoder.git" }

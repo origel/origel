@@ -1,0 +1,92 @@
+use peg::Pipeline;
+use peg::collect_pipelines;
+use flow_control::Statement;
+use flow_control::Comparitor;
+
+#[pub]
+parse_ -> Statement
+      = if_
+      / else_
+      / for_
+      / fn_
+      / end_
+      / pipelines
+
+#[pub]
+if_ -> Statement
+    = whitespace* "if " l:_not_comparitor whitespace c:comparitor whitespace r:_not_comparitor whitespace* { Statement::If{ left: l, comparitor: c, right: r} }
+
+#[pub]
+else_ -> Statement
+    = whitespace* "else" whitespace*  { Statement::Else}
+
+#[pub]
+end_ -> Statement
+    = whitespace* "end" whitespace* { Statement ::End}
+
+#[pub]
+fn_ -> Statement
+    = whitespace* "fn " n:_name whitespace* args:_args whitespace* { Statement::Function{name: n.to_string(), args: args} }
+
+_name -> String
+      = n:$([A-z]+) { n.to_string() }
+
+_args -> Vec<String>
+      = _arg ** " "
+
+_arg -> String
+     = n:$([A-z0-9]+) { n.to_string() }
+
+#[pub]
+for_ -> Statement
+    = whitespace* "for " n:_name " in " args:_args whitespace* { Statement::For{variable: n.to_string(), values: args} }
+
+comparitor -> Comparitor
+    = "==" { Comparitor::Equal }
+    / "!=" { Comparitor::NotEqual }
+    / "<=" { Comparitor::LessThanOrEqual }
+    / ">=" { Comparitor::GreaterThanOrEqual }
+    / "<"  { Comparitor::LessThan }
+    / ">"  { Comparitor::GreaterThan }
+
+_not_comparitor -> String
+    = !comparitor n:$([^ ]+) { n.to_string() }
+
+#[pub]
+pipelines -> Statement
+    = (unused* newline)* [#] .* { Statement::Pipelines(vec![]) }
+    / [ \n\t\r]* _pipelines
+    / (unused*) ** newline { Statement::Pipelines(vec![]) }
+
+
+// Converts the pipeline string into a statement, handling redirection, piping, and backgrounds.
+_pipelines -> Statement
+    = command:$(.+) {?
+    let mut possible_error = None;
+    let mut pipelines: Vec<Pipeline> = Vec::new();
+
+    collect_pipelines(&mut pipelines, &mut possible_error, command);
+
+    if possible_error.is_none() {
+        Ok(Statement::Pipelines(pipelines))
+    } else {
+        Err(possible_error.unwrap())
+    }
+}
+
+unused -> ()
+    = whitespace comment? { () }
+    / comment { () }
+
+comment -> ()
+    = [#] [^\r\n]*
+
+whitespace -> ()
+    = [ \t]+
+
+job_ending -> ()
+    = [;]
+    / newline
+
+newline -> ()
+    = [\r\n]

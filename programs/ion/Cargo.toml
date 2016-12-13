@@ -1,0 +1,24 @@
+[package]
+name = "ion-shell"
+description = "The Ion Shell"
+repository = "https://github.com/redox-os/ion"
+version = "0.1.5"
+license-file = "LICENSE"
+readme = "README.md"
+authors = [
+  "Skyler Berg <skylertheberg@gmail.com>",
+  "Jeremy Soller <jackpot51@gmail.com>",
+  "Michael Gattozzi <mgattozzi@gmail.com>",
+  "Łukasz Niemier <lukasz@niemier.pl>",
+  "Michael Aaron Murphy <mmstickman@gmail.com>",
+]
+
+[[bin]]
+name = "ion"
+
+
+[dependencies]
+glob = "0.2"
+liner = "0.1"
+peg-syntax-ext = "0.4"
+permutate = "0.1"

@@ -1,0 +1,15 @@
+[package]
+name = "pkgutils"
+version = "0.1.0"
+
+[[bin]]
+name = "pkg"
+path = "src/pkg/main.rs"
+
+[dependencies]
+termion = "*"
+
+[dependencies.octavo]
+git = "https://github.com/libOctavo/octavo"
+default-features = false
+features = ["digest"]

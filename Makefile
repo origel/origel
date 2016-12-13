@@ -25,6 +25,27 @@ ECHO=echo
 all:$(BUILD)/libstd.rlib $(BUILD)/initfs.rs
 
 clean:
+	cargo clean
+	cargo clean --manifest-path libstd/Cargo.toml
+	cargo clean --manifest-path drivers/ahcid/Cargo.toml
+	cargo clean --manifest-path drivers/e1000d/Cargo.toml
+	cargo clean --manifest-path drivers/ps2d/Cargo.toml
+	cargo clean --manifest-path drivers/pcid/Cargo.toml
+	cargo clean --manifest-path drivers/rtl8168d/Cargo.toml
+	cargo clean --manifest-path drivers/vesad/Cargo.toml
+	cargo clean --manifest-path programs/acid/Cargo.toml
+	cargo clean --manifest-path programs/contain/Cargo.toml
+	cargo clean --manifest-path programs/init/Cargo.toml
+	cargo clean --manifest-path programs/ion/Cargo.toml
+	cargo clean --manifest-path programs/binutils/Cargo.toml
+	cargo clean --manifest-path programs/coreutils/Cargo.toml
+	cargo clean --manifest-path programs/extrautils/Cargo.toml
+	cargo clean --manifest-path programs/netutils/Cargo.toml
+	cargo clean --manifest-path programs/orbutils/Cargo.toml
+	cargo clean --manifest-path programs/pkgutils/Cargo.toml
+	cargo clean --manifest-path programs/userutils/Cargo.toml
+	cargo clean --manifest-path programs/smith/Cargo.toml
+	cargo clean --manifest-path programs/tar/Cargo.toml
 	rm -rf build
 	rm -rf target
 
@@ -116,3 +137,105 @@ $(BUILD)/initfs.rs: \
 	find initfs -type f -o -type l | cut -d '/' -f2- | sort | awk '{printf("    files.insert(b\"%s\", (include_bytes!(\"../../initfs/%s\"), false));\n", $$0, $$0)}' >> $@
 	echo '    files' >> $@
 	echo '}' >> $@
+
+filesystem/sbin/%: drivers/%/Cargo.toml drivers/%/src/** $(BUILD)/libstd.rlib
+	mkdir -p filesystem/sbin
+	$(CARGO) rustc --manifest-path $< $(CARGOFLAGS) -o $@
+	strip $@
+
+filesystem/bin/%: programs/%/Cargo.toml programs/%/src/** $(BUILD)/libstd.rlib
+	mkdir -p filesystem/bin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+filesystem/bin/sh: filesystem/bin/ion
+	cp $< $@
+
+filesystem/bin/%: programs/binutils/Cargo.toml programs/binutils/src/bin/%.rs $(BUILD)/libstd.rlib
+	mkdir -p filesystem/bin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+filesystem/bin/%: programs/coreutils/Cargo.toml programs/coreutils/src/bin/%.rs $(BUILD)/libstd.rlib
+	mkdir -p filesystem/bin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+filesystem/bin/%: programs/extrautils/Cargo.toml programs/extrautils/src/bin/%.rs $(BUILD)/libstd.rlib
+	mkdir -p filesystem/bin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+filesystem/bin/%: programs/netutils/Cargo.toml programs/netutils/src/%/**.rs $(BUILD)/libstd.rlib
+	mkdir -p filesystem/bin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+filesystem/ui/bin/%: programs/orbutils/Cargo.toml programs/orbutils/src/%/**.rs $(BUILD)/libstd.rlib
+	mkdir -p filesystem/ui/bin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+filesystem/bin/%: programs/pkgutils/Cargo.toml programs/pkgutils/src/%/**.rs $(BUILD)/libstd.rlib
+	mkdir -p filesystem/bin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+filesystem/bin/%: programs/userutils/Cargo.toml programs/userutils/src/bin/%.rs $(BUILD)/libstd.rlib
+	mkdir -p filesystem/bin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+filesystem/sbin/%: schemes/%/Cargo.toml schemes/%/src/** $(BUILD)/libstd.rlib
+	mkdir -p filesystem/sbin
+	$(CARGO) rustc --manifest-path $< --bin $* $(CARGOFLAGS) -o $@
+	strip $@
+
+drivers: \
+	filesystem/sbin/pcid \
+	filesystem/sbin/e1000d \
+	filesystem/sbin/rtl8168d
+
+binutils: \
+	filesystem/bin/hex \
+	filesystem/bin/hexdump \
+	filesystem/bin/strings
+
+coreutils: \
+	filesystem/bin/basename \
+	filesystem/bin/cat \
+	filesystem/bin/chmod \
+	filesystem/bin/clear \
+	filesystem/bin/cp \
+	filesystem/bin/cut \
+	filesystem/bin/date \
+	filesystem/bin/dd \
+	filesystem/bin/df \
+	filesystem/bin/du \
+	filesystem/bin/echo \
+	filesystem/bin/env \
+	filesystem/bin/false \
+	filesystem/bin/free \
+	filesystem/bin/head \
+	filesystem/bin/kill \
+	filesystem/bin/ls \
+	filesystem/bin/mkdir \
+	filesystem/bin/mv \
+	filesystem/bin/printenv \
+	filesystem/bin/ps \
+	filesystem/bin/pwd \
+	filesystem/bin/realpath \
+	filesystem/bin/reset \
+	filesystem/bin/rmdir \
+	filesystem/bin/rm \
+	filesystem/bin/seq \
+	filesystem/bin/sleep \
+	filesystem/bin/sort \
+	filesystem/bin/tail \
+	filesystem/bin/tee \
+	filesystem/bin/time \
+	filesystem/bin/touch \
+	filesystem/bin/true \
+	filesystem/bin/wc \
+	filesystem/bin/yes
+	#filesystem/bin/shutdown filesystem/bin/test
